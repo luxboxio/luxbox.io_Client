@@ -6,32 +6,40 @@
 
 //
 // lightswitch.space Client
-// version: 0.2alpha
+// version: 0.3alpha
 //
 // This Sketch is used to control a bunch of SK2812 LEDs (aka Neopixel)
 // The Strips can be controlled from the lightswitch.space-Server.
 //
+// Some globals
+const int fadedelay = 50; // in millisecond
+const int fadestep = 1;
+
 // A light-element has a unique ID, so it can be identfied within the network.
 // The MAC-address is taken as unique ID, so no need to change this parameter
 String ID = "";
 
 // A light-element controlled by a microcontroller can have one or more Areas
-const int AREAS = 2;              // ToDo: Change to your needs!
+const int AREAS = 2;
 
-// Area 1
-const int AREA_1_PIN = 14;        // ToDo: Change to your needs!
-const int AREA_1_COUNT = 5;       // ToDo: Change to your needs!
-const char* AREA_1_MODE = "RGB"; // ToDo: Change to your needs!
-Adafruit_NeoPixel AREA_1 = Adafruit_NeoPixel(AREA_1_COUNT, AREA_1_PIN, NEO_GRB + NEO_KHZ800);
+// customize the Arrays to your needs.
+// INFO: possible AREA_MODEs are "rgb" and "rgbw"
+const int AREA_PIN[AREAS] = {14, 13};
+const int AREA_COUNT[AREAS] = {5, 3};
+const String AREA_MODE[AREAS] = {"rgb", "rgb"};
 
-// Area 2
-const int AREA_2_PIN = 13;        // ToDo: Change to your needs!
-const int AREA_2_COUNT = 3;       // ToDo: Change to your needs!
-const char* AREA_2_MODE = "RGB"; // ToDo: Change to your needs!
-Adafruit_NeoPixel AREA_2 = Adafruit_NeoPixel(AREA_2_COUNT, AREA_2_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel AREA[AREAS];
 
-// Area n
-// add more Areas when needed;
+// Setup Pixel colors
+int current_red[AREAS] = {0};
+int current_green[AREAS] = {0};
+int current_blue[AREAS] = {0};
+int current_white[AREAS] = {0};
+
+int target_red[AREAS] = {0};
+int target_green[AREAS] = {0};
+int target_blue[AREAS] = {0};
+int target_white[AREAS] = {0};
 
 // Setup Wifi-Connection
 //const char* ssid = "vspace.one";
@@ -49,13 +57,17 @@ char ReplyBuffer[] = "acknowledged"; // a string to send back
 
 void setup()
 {
+    // Initialize all Areas (aka Neopixel stripes)
+    for(int i = 0; i < AREAS; i++)
+    {
+        AREA[i] = Adafruit_NeoPixel(AREA_COUNT[i], AREA_PIN[i], NEO_GRB + NEO_KHZ800);
+        AREA[i].begin();
+        AREA[i].show(); // all pixels off
+    }
+    
     // start serial
     Serial.begin(9600);
     Serial.println("los gehts...");
-
-    // Initialize LED-stripes
-    AREA_1.begin();
-    AREA_2.begin();
 
     // connect to WiFi
     WiFi.mode(WIFI_STA);
@@ -126,7 +138,19 @@ void loop()
         }
     }
 
-    // ToDo: Implement light control
+    for(int i = 0; i < AREAS; i++)
+    {
+        if(current_red[i] != target_red[i]
+            || current_green[i] != target_green[i]
+            || current_blue[i] != target_blue[i]
+            || current_white[i] != target_white[i])
+        {
+            FadeLight(i);
+        }
+        
+    }
+    
+    delay(fadedelay);
 
 }
 
@@ -160,28 +184,112 @@ bool UpdateDataFromJson(char* json)
     if(root["id"] == ID)
     {       
         int area = root["area"];
-        String type = root["type"];
-        
-        if(type == "rgb")
+
+        if(area >= 0 && area < AREAS)
         {
-            int red = root["values"]["red"];
-            int green = root["values"]["green"];
-            int blue = root["values"]["blue"];
+            String type = root["type"];
             
-            Serial.print(" Area: ");
-            Serial.println(area);
-            Serial.print(" Type: ");
-            Serial.println(type);
-            Serial.print("  Red: ");
-            Serial.println(red);
-            Serial.print("Green: ");
-            Serial.println(green);
-            Serial.print(" Blue: ");
-            Serial.println(blue);
+            target_red[area] = root["values"]["red"];
+            target_green[area] = root["values"]["green"];
+            target_blue[area] = root["values"]["blue"];
+            
+            if(type == "rgbw" && AREA_MODE[area] == type)
+            {
+                target_white[area] = root["values"]["white"];
+            }
         }
     }
     
     return state;
+}
+
+void FadeLight(int area)
+{
+    // RED
+    if(current_red[area] != target_red[area])
+    {
+        if(current_red[area] - target_red[area] > 0)
+        {
+            current_red[area] -= fadestep;
+        }
+        else
+        {
+            current_red[area] += fadestep;
+        }
+
+        if(current_red[area] > 255)
+            current_red[area] = 255;
+        if(current_red[area] < 0)
+            current_red[area] = 0;
+    }
+
+    // GREEN
+    if(current_green[area] != target_green[area])
+    {
+        if(current_green[area] - target_green[area] > 0)
+        {
+            current_green[area] -= fadestep;
+        }
+        else
+        {
+            current_green[area] += fadestep;
+        }
+
+        if(current_green[area] > 255)
+            current_green[area] = 255;
+        if(current_green[area] < 0)
+            current_green[area] = 0;
+    }
+
+    // BLUE
+    if(current_blue[area] != target_blue[area])
+    {
+        if(current_blue[area] - target_blue[area] > 0)
+        {
+            current_blue[area] -= fadestep;
+        }
+        else
+        {
+            current_blue[area] += fadestep;
+        }
+
+        if(current_blue[area] > 255)
+            current_blue[area] = 255;
+        if(current_blue[area] < 0)
+            current_blue[area] = 0;
+    }
+
+    // WHITE
+    if(current_white[area] != target_white[area])
+    {
+        if(current_white[area] - target_white[area] > 0)
+        {
+            current_white[area] -= fadestep;
+        }
+        else
+        {
+            current_white[area] += fadestep;
+        }
+
+        if(current_white[area] > 255)
+            current_white[area] = 255;
+        if(current_white[area] < 0)
+            current_white[area] = 0;
+    }
+
+    Serial.print("Fade ");
+    Serial.print(current_red[area]);
+    Serial.print("; ");
+    Serial.print(current_green[area]);
+    Serial.print("; ");
+    Serial.println(current_blue[area]);
+    
+    for (int i = 0; i < AREA_COUNT[area]; i++) {
+        // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+        AREA[area].setPixelColor(i, current_red[area], current_green[area], current_blue[area]); 
+        AREA[area].show();
+    }
+    
 }
 
 // connect to wifi – returns true if successful or false if not
