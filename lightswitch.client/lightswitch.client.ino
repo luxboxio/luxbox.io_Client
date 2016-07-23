@@ -12,7 +12,7 @@
 // The Strips can be controlled from the lightswitch.space-Server.
 //
 // Some globals
-const int fadedelay = 50; // in millisecond
+const int fadedelay = 5; // in millisecond
 const int fadestep = 1;
 
 // A light-element has a unique ID, so it can be identfied within the network.
@@ -42,10 +42,10 @@ int target_blue[AREAS] = {0};
 int target_white[AREAS] = {0};
 
 // Setup Wifi-Connection
-//const char* ssid = "vspace.one";
-//const char* password = "12345678";
-const char* ssid = "Evergreen Terrace 742";
-const char* password = "8840556831567070";
+const char* ssid = "vspace.one";
+const char* password = "12345678";
+//const char* ssid = "Evergreen Terrace 742";
+//const char* password = "8840556831567070";
 boolean wifiConnected = false;
 
 // UDP variables
@@ -62,7 +62,12 @@ void setup()
     {
         AREA[i] = Adafruit_NeoPixel(AREA_COUNT[i], AREA_PIN[i], NEO_GRB + NEO_KHZ800);
         AREA[i].begin();
-        AREA[i].show(); // all pixels off
+
+        for (int j = 0; j < AREA_COUNT[i]; j++)
+        {
+            AREA[i].setPixelColor(j, 0); // all pixels off
+            AREA[i].show();
+        }
     }
     
     // start serial
