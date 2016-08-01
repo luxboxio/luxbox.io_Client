@@ -3,6 +3,7 @@
 #include <ESP8266WiFi.h>
 #include <Adafruit_NeoPixel.h>
 #include <ArduinoJson.h>
+#include "config.h"
 
 //
 // lightswitch.space Client
@@ -41,15 +42,15 @@ int target_green[AREAS] = {0};
 int target_blue[AREAS] = {0};
 int target_white[AREAS] = {0};
 
-// Setup Wifi-Connection
-const char* ssid = "vspace.one";
-const char* password = "12345678";
-//const char* ssid = "Evergreen Terrace 742";
-//const char* password = "8840556831567070";
+// Setup Wifi-Connection -> See config file!
+//const char* ssid = "networkname";
+//const char* password = "password";
+
 boolean wifiConnected = false;
+int currentWifi = 0;
 
 // UDP variables
-unsigned int localPort = 1234;
+unsigned int localPort = 11111;
 WiFiUDP UDP;
 boolean udpConnected = false;
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE]; //buffer to hold incoming packet,
@@ -84,14 +85,6 @@ void setup()
     byte mac[6];
     WiFi.macAddress(mac);
     ID += macToStr(mac);
-
-    Serial.println(" --- lightswitch.space client ---");
-    Serial.print(" IP-Address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("         ID: ");
-    Serial.println(ID);
-    Serial.print("      Areas: ");
-    Serial.println(AREAS);
 
 }
 
@@ -301,16 +294,25 @@ void FadeLight(int area)
 boolean connectWiFi() {
     boolean state = true;
     int i = 0;
-    WiFi.begin(ssid, password);
+    WiFi.begin(ssid[currentWifi], password[currentWifi]);
     Serial.println("");
-    Serial.println("Connecting to WiFi");
+    Serial.print("Connecting to WiFi '");
+    Serial.print(ssid[currentWifi]);
+    Serial.println("'");
 
     // Wait for connection
     Serial.print("Connecting");
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
-        if (i > 10) {
+        if (i > 15) {
+            
+            currentWifi++;
+            if(currentWifi >= NETWORKS)
+            {
+                currentWifi = 0;
+            }
+            
             state = false;
             break;
         }
@@ -318,16 +320,32 @@ boolean connectWiFi() {
     }
     if (state) {
         Serial.println("");
+        Serial.println(" --- lightswitch.space client ---");
         Serial.print("Connected to ");
-        Serial.println(ssid);
+        Serial.println(ssid[currentWifi]);
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
+        Serial.print("         ID: ");
+        Serial.println(ID);
+        Serial.print("      Areas: ");
+        Serial.println(AREAS);
+        Serial.println("");
+
+        SendOwnConfigToLightserver();
+
     }
     else {
         Serial.println("");
         Serial.println("Connection failed.");
     }
     return state;
+}
+
+// Sends the config and current IP-Adress to the lightserver
+void SendOwnConfigToLightserver(){
+    // ToDo: implement api request
+    // lihtserverip:port/lights/:light_id
+    // JSON Data of configuration
 }
 
 // connect to UDP – returns true if successful or false if not
