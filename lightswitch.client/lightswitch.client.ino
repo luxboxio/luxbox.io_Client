@@ -7,7 +7,7 @@
 
 //
 // lightswitch.space Client
-// version: 0.3alpha
+// version: 0.4alpha
 //
 // This Sketch is used to control a bunch of SK2812 LEDs (aka Neopixel)
 // The Strips can be controlled from the lightswitch.space-Server.
@@ -19,15 +19,6 @@ const int fadestep = 1;
 // A light-element has a unique ID, so it can be identfied within the network.
 // The MAC-address is taken as unique ID, so no need to change this parameter
 String ID = "";
-
-// A light-element controlled by a microcontroller can have one or more Areas
-const int AREAS = 2;
-
-// customize the Arrays to your needs.
-// INFO: possible AREA_MODEs are "rgb" and "rgbw"
-const int AREA_PIN[AREAS] = {14, 13};
-const int AREA_COUNT[AREAS] = {5, 3};
-const String AREA_MODE[AREAS] = {"rgb", "rgb"};
 
 Adafruit_NeoPixel AREA[AREAS];
 
@@ -42,10 +33,6 @@ int target_green[AREAS] = {0};
 int target_blue[AREAS] = {0};
 int target_white[AREAS] = {0};
 
-// Setup Wifi-Connection -> See config file!
-//const char* ssid = "networkname";
-//const char* password = "password";
-
 boolean wifiConnected = false;
 int currentWifi = 0;
 
@@ -56,6 +43,10 @@ boolean udpConnected = false;
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE]; //buffer to hold incoming packet,
 char ReplyBuffer[] = "acknowledged"; // a string to send back
 
+const long BroadcastTimer = 5000;  
+unsigned long previousBroadcast = 0;  // will store last time Broadcast was sent
+
+ 
 void setup()
 {
     // Initialize all Areas (aka Neopixel stripes)
@@ -84,8 +75,8 @@ void setup()
 
     byte mac[6];
     WiFi.macAddress(mac);
-    ID += macToStr(mac);
-
+    //ID += macToStr(mac); // ToDo: Cleanup
+    ID = WiFi.macAddress();
 }
 
 void loop()
@@ -98,7 +89,25 @@ void loop()
 
     // check if the WiFi and UDP connections were successful
     if (wifiConnected) {
+
+        unsigned long currentMillis = millis();
+
+        if (currentMillis - previousBroadcast >= BroadcastTimer) {
+            // save the last time you blinked the LED
+            previousBroadcast = currentMillis;
+
+            // Broadcast Test
+            Serial.println("Try broadcasting...");
+            IPAddress broadcastIp(255, 255, 255, 255);
+            UDP.beginPacket(broadcastIp,localPort);
+            UDP.write("Hi, lightswitch is here!");
+            UDP.endPacket();
+            Serial.println("Broadcasting sent");
+        }
+
+            
         if (udpConnected) {
+
             // if there’s data available, read a packet
             int packetSize = UDP.parsePacket();
             if (packetSize)
@@ -326,7 +335,7 @@ boolean connectWiFi() {
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
         Serial.print("         ID: ");
-        Serial.println(ID);
+        Serial.println(WiFi.macAddress());
         Serial.print("      Areas: ");
         Serial.println(AREAS);
         Serial.println("");
@@ -344,8 +353,9 @@ boolean connectWiFi() {
 // Sends the config and current IP-Adress to the lightserver
 void SendOwnConfigToLightserver(){
     // ToDo: implement api request
-    // lihtserverip:port/lights/:light_id
+    // something like 'lihtserverip:port/lights/:light_id'
     // JSON Data of configuration
+    
 }
 
 // connect to UDP – returns true if successful or false if not
