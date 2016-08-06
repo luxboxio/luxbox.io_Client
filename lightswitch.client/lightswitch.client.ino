@@ -37,7 +37,8 @@ boolean wifiConnected = false;
 int currentWifi = 0;
 
 // UDP variables
-unsigned int localPort = 11111;
+unsigned int sendPort = 11110;
+unsigned int recievePort = 11111;
 WiFiUDP UDP;
 boolean udpConnected = false;
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE]; //buffer to hold incoming packet,
@@ -84,27 +85,13 @@ void loop()
     // check if WLAN is connected
     if (WiFi.status() != WL_CONNECTED)
     {
-        connectWiFi();
+        wifiConnected = connectWiFi();
     }
 
     // check if the WiFi and UDP connections were successful
     if (wifiConnected) {
 
-        unsigned long currentMillis = millis();
-
-        if (currentMillis - previousBroadcast >= BroadcastTimer) {
-            // save the last time you blinked the LED
-            previousBroadcast = currentMillis;
-
-            // Broadcast Test
-            Serial.println("Try broadcasting...");
-            IPAddress broadcastIp(255, 255, 255, 255);
-            UDP.beginPacket(broadcastIp,localPort);
-            UDP.write("Hi, lightswitch is here!");
-            UDP.endPacket();
-            Serial.println("Broadcasting sent");
-        }
-
+        broadcastMyself();
             
         if (udpConnected) {
 
@@ -127,6 +114,11 @@ void loop()
                 }
                 Serial.print(", port ");
                 Serial.println(UDP.remotePort());
+
+                // Clear Buffer before reading
+                for( int i = 0; i < UDP_TX_PACKET_MAX_SIZE;  ++i ){
+                    packetBuffer[i] = (char)0;
+                }
 
                 // read the packet into packetBufffer
                 UDP.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
@@ -200,7 +192,7 @@ bool UpdateDataFromJson(char* json)
             target_green[area] = root["values"]["green"];
             target_blue[area] = root["values"]["blue"];
             
-            if(type == "rgbw" && AREA_MODE[area] == type)
+            if(type == "rgbw" && AREA_TYPE[area] == type)
             {
                 target_white[area] = root["values"]["white"];
             }
@@ -339,23 +331,12 @@ boolean connectWiFi() {
         Serial.print("      Areas: ");
         Serial.println(AREAS);
         Serial.println("");
-
-        SendOwnConfigToLightserver();
-
     }
     else {
         Serial.println("");
         Serial.println("Connection failed.");
     }
     return state;
-}
-
-// Sends the config and current IP-Adress to the lightserver
-void SendOwnConfigToLightserver(){
-    // ToDo: implement api request
-    // something like 'lihtserverip:port/lights/:light_id'
-    // JSON Data of configuration
-    
 }
 
 // connect to UDP – returns true if successful or false if not
@@ -365,7 +346,7 @@ boolean connectUDP() {
     Serial.println("");
     Serial.println("Connecting to UDP");
 
-    if (UDP.begin(localPort) == 1) {
+    if (UDP.begin(recievePort) == 1) {
         Serial.println("Connection successful");
         state = true;
     }
@@ -374,6 +355,54 @@ boolean connectUDP() {
     }
 
     return state;
+}
+
+// Broadcast own configuration to lightswitch Server
+void broadcastMyself()
+{
+    unsigned long currentMillis = millis();
+    
+    if (currentMillis - previousBroadcast >= BroadcastTimer) {
+        // save the last time you blinked the LED
+        previousBroadcast = currentMillis;
+
+        Serial.println("Try broadcasting...");
+
+        // prepare Data
+        //
+        // Step 1: Reserve memory space
+        //
+        StaticJsonBuffer<500> jsonBuffer;
+        
+        //
+        // Step 2: Build object tree in memory
+        //
+        JsonObject& root = jsonBuffer.createObject();
+        root["light_id"] = ID;
+        root["name"] = "Name ToDo: Implement!";
+        
+        JsonArray& areas = root.createNestedArray("areas");
+
+        for(int i = 0; i < AREAS; i++)
+        {
+            JsonObject& area = areas.createNestedObject();
+            area["number"] = i;
+            area["color_type"] = AREA_TYPE[i];
+        }
+        
+        //
+        // Step 3: Generate the JSON string
+        //
+        char charBuf[500];
+        root.printTo(charBuf, 500);        
+
+        //Serial.println("Try broadcasting...");
+        IPAddress broadcastIp(255, 255, 255, 255);
+        UDP.beginPacket(broadcastIp,sendPort);
+        UDP.write(charBuf);
+        UDP.endPacket();
+        Serial.println("Broadcasting sent");
+    }
 }
 
 String macToStr(const uint8_t* mac)

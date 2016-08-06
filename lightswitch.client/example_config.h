@@ -36,4 +36,4 @@ const int AREA_PIN[AREAS] = {13, 14};
 // Number of LEDs for each Stripe
 const int AREA_COUNT[AREAS] = {60, 63};
 // colormode for each Stripe
-const String AREA_MODE[AREAS] = {"rgb", "rgb"};
+const String AREA_TYPE[AREAS] = {"rgb", "rgb"};
