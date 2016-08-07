@@ -53,9 +53,17 @@ void setup()
     // Initialize all Areas (aka Neopixel stripes)
     for(int i = 0; i < AREAS; i++)
     {
-        AREA[i] = Adafruit_NeoPixel(AREA_COUNT[i], AREA_PIN[i], NEO_GRB + NEO_KHZ800);
-        AREA[i].begin();
-
+        if(AREA_TYPE[i] == "rgb")
+        {
+            AREA[i] = Adafruit_NeoPixel(AREA_COUNT[i], AREA_PIN[i], NEO_GRB + NEO_KHZ800);
+            AREA[i].begin();
+        }
+        if(AREA_TYPE[i] == "rgbw")
+        {
+            AREA[i] = Adafruit_NeoPixel(AREA_COUNT[i], AREA_PIN[i], NEO_GRBW + NEO_KHZ800);
+            AREA[i].begin();   
+        }
+    
         for (int j = 0; j < AREA_COUNT[i]; j++)
         {
             AREA[i].setPixelColor(j, 0); // all pixels off
@@ -86,6 +94,10 @@ void loop()
     if (WiFi.status() != WL_CONNECTED)
     {
         wifiConnected = connectWiFi();
+        
+        if (wifiConnected) {
+            udpConnected = connectUDP();
+        }
     }
 
     // check if the WiFi and UDP connections were successful
@@ -131,19 +143,20 @@ void loop()
                 UDP.beginPacket(UDP.remoteIP(), UDP.remotePort());
                 UDP.write(ReplyBuffer);
                 UDP.endPacket();
-
+                delay(10);
             }
-            delay(10);
+            
         }
     }
 
     for(int i = 0; i < AREAS; i++)
-    {
+    {        
         if(current_red[i] != target_red[i]
             || current_green[i] != target_green[i]
             || current_blue[i] != target_blue[i]
             || current_white[i] != target_white[i])
         {
+            //Serial.println("Fade..." );
             FadeLight(i);
         }
         
@@ -165,7 +178,7 @@ bool UpdateDataFromJson(char* json)
     
     bool state = true;
     // Step 1: Reserve memory space
-    StaticJsonBuffer<500> jsonBuffer;
+    StaticJsonBuffer<3000> jsonBuffer;
 
     Serial.println("StaticJsonBuffer defined");
     
@@ -179,22 +192,50 @@ bool UpdateDataFromJson(char* json)
       Serial.println("parseObject() failed");
       return false;
     }
-    
-    if(root["id"] == ID)
-    {       
-        int area = root["area"];
 
-        if(area >= 0 && area < AREAS)
+    if(root["light_id"] == ID)
+    {     
+        Serial.println("-> ID correct");
+
+        if(root["areas"].size() > 0)
         {
-            String type = root["type"];
-            
-            target_red[area] = root["values"]["red"];
-            target_green[area] = root["values"]["green"];
-            target_blue[area] = root["values"]["blue"];
-            
-            if(type == "rgbw" && AREA_TYPE[area] == type)
+            // set light for every area
+            for(int i = 0; i < root["areas"].size() || i < AREAS; i++)
             {
-                target_white[area] = root["values"]["white"];
+                // get color values for the current area
+                int AreaNumber = root["areas"][i]["number"];
+                
+                //root["areas"][i]["values"].prettyPrintTo(Serial);
+
+                for(int j = 0; j < root["areas"][i]["values"].size(); j++)
+                {
+                    String color_name = root["areas"][i]["values"][j]["color"];
+                    int color_value = root["areas"][i]["values"][j]["value"];
+
+                    Serial.print("Color: ");
+                    Serial.print(color_name);
+                    Serial.print(" -> ");
+                    Serial.println(color_value);
+
+                    // ToDo: Rework to Switch!?
+                    
+                    if(color_name == "r")
+                    { 
+                        target_red[i] = color_value;
+                    }
+                    if(color_name == "g")
+                    {
+                        target_green[i] = color_value;
+                    }
+                    if(color_name == "b")
+                    {
+                        target_blue[i] = color_value;
+                    }
+                    if(color_name == "w")
+                    {
+                        target_white[i] = color_value;
+                    }
+                } 
             }
         }
     }
@@ -276,18 +317,32 @@ void FadeLight(int area)
             current_white[area] = 0;
     }
 
-    Serial.print("Fade ");
+    /*Serial.print("Fade ");
     Serial.print(current_red[area]);
     Serial.print("; ");
     Serial.print(current_green[area]);
     Serial.print("; ");
-    Serial.println(current_blue[area]);
+    Serial.print(current_blue[area]);
+    Serial.print("; ");
+    Serial.println(current_white[area]);*/
     
     for (int i = 0; i < AREA_COUNT[area]; i++) {
-        // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
-        AREA[area].setPixelColor(i, current_red[area], current_green[area], current_blue[area]); 
-        AREA[area].show();
+        
+        if(AREA_TYPE[area] == "rgb")
+        {
+            // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+            AREA[area].setPixelColor(i, current_red[area], current_green[area], current_blue[area]);   
+        }
+        if(AREA_TYPE[area] == "rgbw")
+        {
+            // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+            AREA[area].setPixelColor(i, current_red[area], current_green[area], current_blue[area], current_white[area]); 
+        }
+               
     }
+    AREA[area].show();
+
+    Serial.print("#");
     
 }
 
@@ -372,7 +427,7 @@ void broadcastMyself()
         //
         // Step 1: Reserve memory space
         //
-        StaticJsonBuffer<500> jsonBuffer;
+        StaticJsonBuffer<1000> jsonBuffer;
         
         //
         // Step 2: Build object tree in memory
@@ -388,6 +443,14 @@ void broadcastMyself()
             JsonObject& area = areas.createNestedObject();
             area["number"] = i;
             area["color_type"] = AREA_TYPE[i];
+
+            JsonArray& values = area.createNestedArray("values");
+
+            for(int j = 0; j < AREA_TYPE[i].length(); j++){
+                JsonObject& colorvalue = values.createNestedObject();
+                String tmp = String(AREA_TYPE[i].charAt(j));
+                colorvalue["color"] = tmp;
+            }
         }
         
         //
