@@ -29,11 +29,9 @@ const char* password[NETWORKS] = {
 // customize the Arrays to your needs.
 // INFO: possible AREA_MODEs are "rgb" and "rgbw"
 
-// Number of Areas
-const int AREAS = 2;
-// Data-Pins from MC to LED-Stripe
-const int AREA_PIN[AREAS] = {13, 14};
-// Number of LEDs for each Stripe
-const int AREA_COUNT[AREAS] = {60, 63};
-// colormode for each Stripe
+#define AREAS 2
 const String AREA_TYPE[AREAS] = {"rgb", "rgb"};
+const String AREA_NAME[AREAS] = {"inner Logo", "outer Ring"};
+Adafruit_NeoPixel AREA[AREAS] = {
+    Adafruit_NeoPixel(60, 13, NEO_GRB + NEO_KHZ800),
+    Adafruit_NeoPixel(63, 14, NEO_GRB + NEO_KHZ800)};

@@ -20,8 +20,6 @@ const int fadestep = 1;
 // The MAC-address is taken as unique ID, so no need to change this parameter
 String ID = "";
 
-Adafruit_NeoPixel AREA[AREAS];
-
 // Setup Pixel colors
 int current_red[AREAS] = {0};
 int current_green[AREAS] = {0};
@@ -53,18 +51,9 @@ void setup()
     // Initialize all Areas (aka Neopixel stripes)
     for(int i = 0; i < AREAS; i++)
     {
-        if(AREA_TYPE[i] == "rgb")
-        {
-            AREA[i] = Adafruit_NeoPixel(AREA_COUNT[i], AREA_PIN[i], NEO_GRB + NEO_KHZ800);
-            AREA[i].begin();
-        }
-        if(AREA_TYPE[i] == "rgbw")
-        {
-            AREA[i] = Adafruit_NeoPixel(AREA_COUNT[i], AREA_PIN[i], NEO_GRBW + NEO_KHZ800);
-            AREA[i].begin();   
-        }
-    
-        for (int j = 0; j < AREA_COUNT[i]; j++)
+        AREA[i].begin();   
+
+        for (int j = 0; j < AREA[i].numPixels(); j++)
         {
             AREA[i].setPixelColor(j, 0); // all pixels off
             AREA[i].show();
@@ -84,7 +73,6 @@ void setup()
 
     byte mac[6];
     WiFi.macAddress(mac);
-    //ID += macToStr(mac); // ToDo: Cleanup
     ID = WiFi.macAddress();
 }
 
@@ -158,12 +146,8 @@ void loop()
         {
             //Serial.println("Fade..." );
             FadeLight(i);
-        }
-        
+        }  
     }
-    
-    delay(fadedelay);
-
 }
 
 
@@ -326,7 +310,7 @@ void FadeLight(int area)
     Serial.print("; ");
     Serial.println(current_white[area]);*/
     
-    for (int i = 0; i < AREA_COUNT[area]; i++) {
+    for (int i = 0; i < AREA[area].numPixels(); i++) {
         
         if(AREA_TYPE[area] == "rgb")
         {
@@ -342,7 +326,7 @@ void FadeLight(int area)
     }
     AREA[area].show();
 
-    Serial.print("#");
+    //Serial.print("#");
     
 }
 
@@ -434,7 +418,7 @@ void broadcastMyself()
         //
         JsonObject& root = jsonBuffer.createObject();
         root["light_id"] = ID;
-        root["name"] = "Name ToDo: Implement!";
+        root["name"] = NAME;
         
         JsonArray& areas = root.createNestedArray("areas");
 
@@ -442,6 +426,7 @@ void broadcastMyself()
         {
             JsonObject& area = areas.createNestedObject();
             area["number"] = i;
+            area["name"] = AREA_NAME[i];
             area["color_type"] = AREA_TYPE[i];
 
             JsonArray& values = area.createNestedArray("values");
