@@ -16,11 +16,19 @@
 const int fadedelay = 5; // in millisecond
 const int fadestep = 1;
 
+const int FadeTimer = 1000; // total fadetime in milliseconds for a colorchange
+unsigned long CurrentFadeTime = 0;
+unsigned long previousFade = 1;
 // A light-element has a unique ID, so it can be identfied within the network.
 // The MAC-address is taken as unique ID, so no need to change this parameter
 String ID = "";
 
 // Setup Pixel colors
+int from_red[AREAS] = {0};
+int from_green[AREAS] = {0};
+int from_blue[AREAS] = {0};
+int from_white[AREAS] = {0};
+
 int current_red[AREAS] = {0};
 int current_green[AREAS] = {0};
 int current_blue[AREAS] = {0};
@@ -73,7 +81,7 @@ void setup()
 
     byte mac[6];
     WiFi.macAddress(mac);
-    ID = WiFi.macAddress();
+    ID = WiFi.macAddress(); // ToDo: Remove the colons from MAC address
 }
 
 void loop()
@@ -126,6 +134,12 @@ void loop()
                 Serial.println(packetBuffer);
 
                 bool ok = UpdateDataFromJson(packetBuffer);
+
+                if(ok)
+                {
+                    // Reset Fadetime and start fade again
+                    CurrentFadeTime = 0;
+                }
                 
                 // send a reply, to the IP address and port that sent us the packet we received
                 UDP.beginPacket(UDP.remoteIP(), UDP.remotePort());
@@ -138,15 +152,25 @@ void loop()
     }
 
     for(int i = 0; i < AREAS; i++)
-    {        
+    {
+        // New color Info set
+        // fade starts from current colors :-)
+        if(CurrentFadeTime == 0)
+        {
+            from_red[i] = current_red[i];
+            from_green[i] = current_green[i];
+            from_blue[i] = current_blue[i];
+            from_white[i] = current_white[i];
+        }
+                
         if(current_red[i] != target_red[i]
             || current_green[i] != target_green[i]
             || current_blue[i] != target_blue[i]
             || current_white[i] != target_white[i])
         {
-            //Serial.println("Fade..." );
-            FadeLight(i);
-        }  
+            //FadeLight(i); //old pragmatic way
+            FadeLightTwo(i);
+        }
     }
 }
 
@@ -225,6 +249,44 @@ bool UpdateDataFromJson(char* json)
     }
     
     return state;
+}
+
+void FadeLightTwo(int a)
+{
+    unsigned long currentMillis = millis();
+
+    // check if we have to make one of maximum 255 steps (8bit color)
+    if (currentMillis - previousFade >= (FadeTimer / 255)) 
+    {
+        // ToDo: Check division of int/long values!!!
+        
+        Serial.print("Fade ");
+        Serial.print(current_red[a]);
+        Serial.print("; ");
+        Serial.print(current_green[a]);
+        Serial.print("; ");
+        Serial.print(current_blue[a]);
+        Serial.print("; ");
+        Serial.print(current_white[a]);
+        Serial.print(" | CurrentFadeTime: ");
+        Serial.print(CurrentFadeTime);
+    
+        // save last fade iteration
+        previousFade = currentMillis;
+
+        CurrentFadeTime += currentMillis - previousFade;
+
+        current_red[a]      = (from_red[a]   - target_red[a])   * CurrentFadeTime/FadeTimer;
+        current_green[a]    = (from_green[a] - target_green[a]) * CurrentFadeTime/FadeTimer;
+        current_blue[a]     = (from_blue[a]  - target_blue[a])  * CurrentFadeTime/FadeTimer;
+        current_white[a]    = (from_white[a] - target_white[a]) * CurrentFadeTime/FadeTimer;
+    }
+    
+    for (int i = 0; i < AREA[a].numPixels(); i++) {
+        // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+        AREA[a].setPixelColor(i, current_red[a], current_green[a], current_blue[a], current_white[a]);                    
+    }
+    AREA[a].show();
 }
 
 void FadeLight(int area)
