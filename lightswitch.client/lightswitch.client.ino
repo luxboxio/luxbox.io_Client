@@ -157,24 +157,33 @@ void loop()
         }
     }
 
-    for(int i = 0; i < AREAS; i++)
+    // New color Info set
+    // fade starts from current colors :-)
+    if(CurrentFadeTime == 0)
     {
-        // New color Info set
-        // fade starts from current colors :-)
-        if(CurrentFadeTime == 0)
+        for(int i = 0; i < AREAS; i++)
         {
             from_red[i] = current_red[i];
             from_green[i] = current_green[i];
             from_blue[i] = current_blue[i];
             from_white[i] = current_white[i];
         }
+    }
+        
+    for(int i = 0; i < AREAS; i++)
+    {
                 
         if(current_red[i] != target_red[i]
             || current_green[i] != target_green[i]
             || current_blue[i] != target_blue[i]
             || current_white[i] != target_white[i])
         {
-            //FadeLight(i); //old pragmatic way
+            /* ToDo: Bug in Fadetime assumption:
+             *       -> Calculation of passed time (micros) is not correct.
+             *       -> every run the counter is raised
+             *       -> the for loop of AREAS is the cause.
+             *  e.g 4 Areas -> Every AREA now has only 64 Steps!!!
+             */
             FadeLightTwo(i);
         }
 
@@ -325,110 +334,6 @@ void FadeLightTwo(int a)
     }
     AREA[a].show();
 }
-
-/*void FadeLight(int area)
-{
-    // RED
-    if(current_red[area] != target_red[area])
-    {
-        if(current_red[area] - target_red[area] > 0)
-        {
-            current_red[area] -= fadestep;
-        }
-        else
-        {
-            current_red[area] += fadestep;
-        }
-
-        if(current_red[area] > 255)
-            current_red[area] = 255;
-        if(current_red[area] < 0)
-            current_red[area] = 0;
-    }
-
-    // GREEN
-    if(current_green[area] != target_green[area])
-    {
-        if(current_green[area] - target_green[area] > 0)
-        {
-            current_green[area] -= fadestep;
-        }
-        else
-        {
-            current_green[area] += fadestep;
-        }
-
-        if(current_green[area] > 255)
-            current_green[area] = 255;
-        if(current_green[area] < 0)
-            current_green[area] = 0;
-    }
-
-    // BLUE
-    if(current_blue[area] != target_blue[area])
-    {
-        if(current_blue[area] - target_blue[area] > 0)
-        {
-            current_blue[area] -= fadestep;
-        }
-        else
-        {
-            current_blue[area] += fadestep;
-        }
-
-        if(current_blue[area] > 255)
-            current_blue[area] = 255;
-        if(current_blue[area] < 0)
-            current_blue[area] = 0;
-    }
-
-    // WHITE
-    if(current_white[area] != target_white[area])
-    {
-        if(current_white[area] - target_white[area] > 0)
-        {
-            current_white[area] -= fadestep;
-        }
-        else
-        {
-            current_white[area] += fadestep;
-        }
-
-        if(current_white[area] > 255)
-            current_white[area] = 255;
-        if(current_white[area] < 0)
-            current_white[area] = 0;
-    }
-
-    //Serial.print("Fade ");
-    //Serial.print(current_red[area]);
-    //Serial.print("; ");
-    //Serial.print(current_green[area]);
-    //Serial.print("; ");
-    //Serial.print(current_blue[area]);
-    //Serial.print("; ");
-    //Serial.println(current_white[area]);
-    
-    for (int i = 0; i < AREA[area].numPixels(); i++) {
-        
-        if(AREA_TYPE[area] == "rgb")
-        {
-            // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
-            AREA[area].setPixelColor(i, current_red[area], current_green[area], current_blue[area]);   
-        }
-        if(AREA_TYPE[area] == "rgbw")
-        {
-            // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
-            AREA[area].setPixelColor(i, current_red[area], current_green[area], current_blue[area], current_white[area]); 
-        }
-               
-    }
-    AREA[area].show();
-
-    //Serial.print("#");
-    
-}
-*/
 
 // connect to wifi – returns true if successful or false if not
 boolean connectWiFi() {
