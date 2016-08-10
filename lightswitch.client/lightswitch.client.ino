@@ -16,7 +16,8 @@
 const int fadedelay = 5; // in millisecond
 const int fadestep = 1;
 
-const int FadeTimer = 1000; // total fadetime in milliseconds for a colorchange
+const unsigned long FadeTimer = 2000000; // total fadetime in milliseconds for a colorchange
+unsigned long FadeTimerPart = 0;
 unsigned long CurrentFadeTime = 0;
 unsigned long previousFade = 1;
 // A light-element has a unique ID, so it can be identfied within the network.
@@ -55,7 +56,7 @@ unsigned long previousBroadcast = 0;  // will store last time Broadcast was sent
 
  
 void setup()
-{
+{    
     // Initialize all Areas (aka Neopixel stripes)
     for(int i = 0; i < AREAS; i++)
     {
@@ -67,11 +68,14 @@ void setup()
             AREA[i].show();
         }
     }
+
+    // Initialize Fadetimer
+    FadeTimerPart = FadeTimer / 255;
     
     // start serial
     Serial.begin(9600);
     Serial.println("los gehts...");
-
+    
     // connect to WiFi
     WiFi.mode(WIFI_STA);
     wifiConnected = connectWiFi();
@@ -107,6 +111,8 @@ void loop()
             int packetSize = UDP.parsePacket();
             if (packetSize)
             {
+                // ToDo: deaktivate! Serial.println because of performance.
+                
                 Serial.println("");
                 Serial.print("Received packet of size ");
                 Serial.println(packetSize);
@@ -170,6 +176,16 @@ void loop()
         {
             //FadeLight(i); //old pragmatic way
             FadeLightTwo(i);
+        }
+
+        if(CurrentFadeTime > FadeTimer)
+        {
+            CurrentFadeTime = 0;
+
+            current_red[i] = target_red[i];
+            current_green[i] = target_green[i];
+            current_blue[i] = target_blue[i];
+            current_white[i] = target_white[i];
         }
     }
 }
@@ -251,35 +267,56 @@ bool UpdateDataFromJson(char* json)
     return state;
 }
 
+// New time and color constant Fader version
 void FadeLightTwo(int a)
 {
-    unsigned long currentMillis = millis();
+    unsigned long currentMicros = micros();
 
-    // check if we have to make one of maximum 255 steps (8bit color)
-    if (currentMillis - previousFade >= (FadeTimer / 255)) 
+    if (currentMicros - previousFade >= FadeTimerPart)
     {
-        // ToDo: Check division of int/long values!!!
-        
-        Serial.print("Fade ");
-        Serial.print(current_red[a]);
-        Serial.print("; ");
-        Serial.print(current_green[a]);
-        Serial.print("; ");
-        Serial.print(current_blue[a]);
-        Serial.print("; ");
-        Serial.print(current_white[a]);
-        Serial.print(" | CurrentFadeTime: ");
-        Serial.print(CurrentFadeTime);
-    
-        // save last fade iteration
-        previousFade = currentMillis;
+        previousFade = currentMicros;
+        CurrentFadeTime += FadeTimerPart;
+        double percentage = (double)CurrentFadeTime / (double)FadeTimer;
 
-        CurrentFadeTime += currentMillis - previousFade;
+        double value_red = (double)(target_red[a] - from_red[a]) * percentage + (double)from_red[a];
+        double value_green = (double)(target_green[a] - from_green[a]) * percentage + (double)from_green[a];
+        double value_blue = (double)(target_blue[a] - from_blue[a]) * percentage + (double)from_blue[a];
+        double value_white = (double)(target_white[a] - from_white[a]) * percentage + (double)from_white[a];
 
-        current_red[a]      = (from_red[a]   - target_red[a])   * CurrentFadeTime/FadeTimer;
-        current_green[a]    = (from_green[a] - target_green[a]) * CurrentFadeTime/FadeTimer;
-        current_blue[a]     = (from_blue[a]  - target_blue[a])  * CurrentFadeTime/FadeTimer;
-        current_white[a]    = (from_white[a] - target_white[a]) * CurrentFadeTime/FadeTimer;
+        int check_red = (int) floor(value_red);
+        if(check_red > 255)
+            check_red = 255;
+        if(check_red < 0)
+            check_red = 0;
+
+        int check_green = (int) floor(value_green);
+        if(check_green > 255)
+            check_green = 255;
+        if(check_green < 0)
+            check_green = 0;
+            
+        int check_blue = (int) floor(value_blue);
+        if(check_blue > 255)
+            check_blue = 255;
+        if(check_blue < 0)
+            check_blue = 0;
+
+        int check_white = (int) floor(value_white);
+        if(check_white > 255)
+            check_white = 255;
+        if(check_white < 0)
+            check_white = 0;
+            
+        current_red[a]      = check_red;
+        current_green[a]    = check_green;
+        current_blue[a]     = check_blue;
+        current_white[a]    = check_white;
+
+        /*Serial.print(CurrentFadeTime);
+        Serial.print(" | ");
+        Serial.print(percentage, 2);
+        Serial.print(" | ");
+        Serial.println(current_red[a]);*/
     }
     
     for (int i = 0; i < AREA[a].numPixels(); i++) {
@@ -289,7 +326,7 @@ void FadeLightTwo(int a)
     AREA[a].show();
 }
 
-void FadeLight(int area)
+/*void FadeLight(int area)
 {
     // RED
     if(current_red[area] != target_red[area])
@@ -363,14 +400,14 @@ void FadeLight(int area)
             current_white[area] = 0;
     }
 
-    /*Serial.print("Fade ");
-    Serial.print(current_red[area]);
-    Serial.print("; ");
-    Serial.print(current_green[area]);
-    Serial.print("; ");
-    Serial.print(current_blue[area]);
-    Serial.print("; ");
-    Serial.println(current_white[area]);*/
+    //Serial.print("Fade ");
+    //Serial.print(current_red[area]);
+    //Serial.print("; ");
+    //Serial.print(current_green[area]);
+    //Serial.print("; ");
+    //Serial.print(current_blue[area]);
+    //Serial.print("; ");
+    //Serial.println(current_white[area]);
     
     for (int i = 0; i < AREA[area].numPixels(); i++) {
         
@@ -391,6 +428,7 @@ void FadeLight(int area)
     //Serial.print("#");
     
 }
+*/
 
 // connect to wifi – returns true if successful or false if not
 boolean connectWiFi() {
@@ -461,13 +499,13 @@ boolean connectUDP() {
 // Broadcast own configuration to lightswitch Server
 void broadcastMyself()
 {
-    unsigned long currentMillis = millis();
+    unsigned long currentMicros = millis();
     
-    if (currentMillis - previousBroadcast >= BroadcastTimer) {
+    if (currentMicros - previousBroadcast >= BroadcastTimer) {
         // save the last time you blinked the LED
-        previousBroadcast = currentMillis;
+        previousBroadcast = currentMicros;
 
-        Serial.println("Try broadcasting...");
+        //Serial.println("Try broadcasting...");
 
         // prepare Data
         //
@@ -511,7 +549,7 @@ void broadcastMyself()
         UDP.beginPacket(broadcastIp,sendPort);
         UDP.write(charBuf);
         UDP.endPacket();
-        Serial.println("Broadcasting sent");
+        //Serial.println("Broadcasting sent");
     }
 }
 
