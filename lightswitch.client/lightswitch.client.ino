@@ -40,6 +40,10 @@ int target_green[AREAS] = {0};
 int target_blue[AREAS] = {0};
 int target_white[AREAS] = {0};
 
+// Setup Color Mode
+int color_mode[AREAS] = {0};
+
+
 boolean wifiConnected = false;
 int currentWifi = 0;
 
@@ -101,12 +105,12 @@ void loop()
     }
 
     // check if the WiFi and UDP connections were successful
-    if (wifiConnected) {
-
+    if (wifiConnected) 
+    {
         broadcastMyself();
             
-        if (udpConnected) {
-
+        if (udpConnected) 
+        {
             // if there’s data available, read a packet
             int packetSize = UDP.parsePacket();
             if (packetSize)
@@ -130,7 +134,8 @@ void loop()
                 Serial.println(UDP.remotePort());
 
                 // Clear Buffer before reading
-                for( int i = 0; i < UDP_TX_PACKET_MAX_SIZE;  ++i ){
+                for( int i = 0; i < UDP_TX_PACKET_MAX_SIZE;  ++i )
+                {
                     packetBuffer[i] = (char)0;
                 }
 
@@ -152,10 +157,11 @@ void loop()
                 UDP.write(ReplyBuffer);
                 UDP.endPacket();
                 delay(10);
-            }
-            
+            }    
         }
     }
+
+    
 
     // New color Info set
     // fade starts from current colors :-)
@@ -172,29 +178,42 @@ void loop()
         
     for(int i = 0; i < AREAS; i++)
     {
-                
-        if(current_red[i] != target_red[i]
-            || current_green[i] != target_green[i]
-            || current_blue[i] != target_blue[i]
-            || current_white[i] != target_white[i])
-        {
-            /* ToDo: Bug in Fadetime assumption:
-             *       -> Calculation of passed time (micros) is not correct.
-             *       -> every run the counter is raised
-             *       -> the for loop of AREAS is the cause.
-             *  e.g 4 Areas -> Every AREA now has only 64 Steps!!!
-             */
-            FadeLightTwo(i);
+        // Color-Mode 0: solid
+        if(color_mode[i] == 0)
+        {         
+            if(current_red[i] != target_red[i]
+                || current_green[i] != target_green[i]
+                || current_blue[i] != target_blue[i]
+                || current_white[i] != target_white[i])
+            {
+                /* ToDo: Bug in Fadetime assumption:
+                 *       -> Calculation of passed time (micros) is not correct.
+                 *       -> every run the counter is raised
+                 *       -> the for loop of AREAS is the cause.
+                 *  e.g 4 Areas -> Every AREA now has only 64 Steps!!!
+                 */
+                FadeLightTwo(i);
+            }
+    
+            if(CurrentFadeTime > FadeTimer)
+            {
+                CurrentFadeTime = 0;
+    
+                current_red[i] = target_red[i];
+                current_green[i] = target_green[i];
+                current_blue[i] = target_blue[i];
+                current_white[i] = target_white[i];
+            }
         }
-
-        if(CurrentFadeTime > FadeTimer)
-        {
-            CurrentFadeTime = 0;
-
-            current_red[i] = target_red[i];
-            current_green[i] = target_green[i];
-            current_blue[i] = target_blue[i];
-            current_white[i] = target_white[i];
+        // Color-Mode 1: rainbow
+        if(color_mode[i] == 1)
+        { 
+           // ToDo ?! 
+        }
+        // Color-Mode 2: rainbow cycle
+        if(color_mode[i] == 1)
+        { 
+            // ToDo ?!
         }
     }
 }
@@ -237,44 +256,84 @@ bool UpdateDataFromJson(char* json)
             {
                 // get color values for the current area
                 int AreaNumber = root["areas"][i]["number"];
-                
-                //root["areas"][i]["values"].prettyPrintTo(Serial);
 
-                for(int j = 0; j < root["areas"][i]["values"].size(); j++)
-                {
-                    String color_name = root["areas"][i]["values"][j]["color"];
-                    int color_value = root["areas"][i]["values"][j]["value"];
+                color_mode[i] = root["areas"][i]["color_mode"];
 
-                    Serial.print("Color: ");
-                    Serial.print(color_name);
-                    Serial.print(" -> ");
-                    Serial.println(color_value);
-
-                    // ToDo: Rework to Switch!?
-                    
-                    if(color_name == "r")
-                    { 
-                        target_red[i] = color_value;
-                    }
-                    if(color_name == "g")
+                // Color-Mode 0: solid
+                if(color_mode[i] == 0)
+                {                
+                    for(int j = 0; j < root["areas"][i]["values"].size(); j++)
                     {
-                        target_green[i] = color_value;
-                    }
-                    if(color_name == "b")
-                    {
-                        target_blue[i] = color_value;
-                    }
-                    if(color_name == "w")
-                    {
-                        target_white[i] = color_value;
-                    }
-                } 
+                        String color_name = root["areas"][i]["values"][j]["color"];
+                        int color_value = root["areas"][i]["values"][j]["value"];
+    
+                        Serial.print("Color: ");
+                        Serial.print(color_name);
+                        Serial.print(" -> ");
+                        Serial.println(color_value);
+    
+                        // ToDo: Rework to Switch!?
+                        
+                        if(color_name == "r")
+                        { 
+                            target_red[i] = color_value;
+                        }
+                        if(color_name == "g")
+                        {
+                            target_green[i] = color_value;
+                        }
+                        if(color_name == "b")
+                        {
+                            target_blue[i] = color_value;
+                        }
+                        if(color_name == "w")
+                        {
+                            target_white[i] = color_value;
+                        }
+                    } 
+                }
+                // Color-Mode 1: rainbow
+                if(color_mode[i] == 1)
+                { 
+                   // ToDo ?! 
+                }
+                // Color-Mode 2: rainbow cycle
+                if(color_mode[i] == 1)
+                { 
+                    // ToDo ?!
+                }
             }
         }
     }
     
     return state;
 }
+
+/*
+void rainbow() {
+  uint16_t i, j;
+
+  for(j=0; j<256; j++) {
+    for(i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i+j) & 255));
+    }
+    strip.show();
+  }
+}
+*/
+
+
+/*void rainbowCycle() {
+  uint16_t i, j;
+
+  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
+    for(i=0; i< strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+    }
+    strip.show();
+  }
+}
+*/
 
 // New time and color constant Fader version
 void FadeLightTwo(int a)
@@ -465,4 +524,20 @@ String macToStr(const uint8_t* mac)
         result += String(mac[i], 16);
     }
     return result;
+}
+
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return (byte)(255 - WheelPos * 3) & (byte)(0) & (byte)(WheelPos * 3) & (byte)(0);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return (byte)(0) & (byte)(WheelPos * 3) & (byte)(255 - WheelPos * 3) & (byte)(0);
+  }
+  WheelPos -= 170;
+  return (byte)(WheelPos * 3) & (byte)(255 - WheelPos * 3) & (byte)(0) & (byte)(0);
 }
