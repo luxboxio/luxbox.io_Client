@@ -4,3 +4,7 @@ config.h
 *.sublime-workspace
 
 *.bin
+
+*.bin
+
+lightswitch.client/lightswitch.client.ino.adafruit.bin

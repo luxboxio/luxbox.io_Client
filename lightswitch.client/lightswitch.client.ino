@@ -7,19 +7,22 @@
 
 //
 // lightswitch.space Client
-// version: 0.4alpha
+// version: 0.5alpha
 //
 // This Sketch is used to control a bunch of SK2812 LEDs (aka Neopixel)
 // The Strips can be controlled from the lightswitch.space-Server.
 //
-// Some globals
-const int fadedelay = 5; // in millisecond
-const int fadestep = 1;
 
-const unsigned long FadeTimer = 2000000; // total fadetime in milliseconds for a colorchange
-unsigned long FadeTimerPart = 0;
-unsigned long CurrentFadeTime = 0;
-unsigned long previousFade = 1;
+const unsigned long FadeTimer[AREAS] = {2000000}; // total fadetime in milliseconds for a colorchange
+unsigned long FadeTimerPart[AREAS] = {0};
+unsigned long CurrentFadeTime[AREAS] = {0};
+unsigned long previousFade[AREAS] = {1};
+
+const unsigned long CircleTimer[AREAS] = {10000000}; // total fadetime in milliseconds for a colorchange
+unsigned long CircleTimerPart[AREAS] = {0};
+unsigned long CurrentCircleTime[AREAS] = {0};
+unsigned long previousCircle[AREAS] = {1};
+
 // A light-element has a unique ID, so it can be identfied within the network.
 // The MAC-address is taken as unique ID, so no need to change this parameter
 String ID = "";
@@ -71,13 +74,14 @@ void setup()
             AREA[i].setPixelColor(j, 0); // all pixels off
             AREA[i].show();
         }
+
+        // Initialize Fadetimer / Circletimer
+        FadeTimerPart[i] = FadeTimer[i] / 255;
+        CircleTimerPart[i] = CircleTimer[i] / 255;
     }
 
-    // Initialize Fadetimer
-    FadeTimerPart = FadeTimer / 255;
-    
     // start serial
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.println("los gehts...");
     
     // connect to WiFi
@@ -94,7 +98,9 @@ void setup()
 
 void loop()
 {
-    // check if WLAN is connected
+    /* --------------------------
+     * check if WLAN is connected
+     * -------------------------- */
     if (WiFi.status() != WL_CONNECTED)
     {
         wifiConnected = connectWiFi();
@@ -103,69 +109,84 @@ void loop()
             udpConnected = connectUDP();
         }
     }
-
-    // check if the WiFi and UDP connections were successful
+    
+    /* -------------------------------
+     * Broadcast & UPDRecieve Handling
+     * ------------------------------- */
     if (wifiConnected) 
     {
         broadcastMyself();
-            
         if (udpConnected) 
         {
-            // if there’s data available, read a packet
-            int packetSize = UDP.parsePacket();
-            if (packetSize)
+            if(RecieveUpdPackage())
             {
-                // ToDo: deaktivate! Serial.println because of performance.
-                
-                Serial.println("");
-                Serial.print("Received packet of size ");
-                Serial.println(packetSize);
-                Serial.print("From ");
-                IPAddress remote = UDP.remoteIP();
-                for (int i = 0; i < 4; i++)
+                for(int i = 0; i < AREAS; i++)
                 {
-                    Serial.print(remote[i], DEC);
-                    if (i < 3)
-                    {
-                        Serial.print(".");
-                    }
+                    CurrentFadeTime[i] = 0;
                 }
-                Serial.print(", port ");
-                Serial.println(UDP.remotePort());
-
-                // Clear Buffer before reading
-                for( int i = 0; i < UDP_TX_PACKET_MAX_SIZE;  ++i )
-                {
-                    packetBuffer[i] = (char)0;
-                }
-
-                // read the packet into packetBufffer
-                UDP.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
-                Serial.println("Contents: ");                
-                Serial.println(packetBuffer);
-
-                bool ok = UpdateDataFromJson(packetBuffer);
-
-                if(ok)
-                {
-                    // Reset Fadetime and start fade again
-                    CurrentFadeTime = 0;
-                }
-                
-                // send a reply, to the IP address and port that sent us the packet we received
-                UDP.beginPacket(UDP.remoteIP(), UDP.remotePort());
-                UDP.write(ReplyBuffer);
-                UDP.endPacket();
-                delay(10);
-            }    
+            }
         }
     }
-
     
+    /* -------------------------------------------
+     * Color-Loop, dependent on mode for each Area
+     * ------------------------------------------- */
+    
+    for(int i = 0; i < AREAS; i++)
+    {
+        unsigned long currentMicros = micros();
+        double TimerPercentage = -1;
+        double CirclePercentage = -1;
+    
+        // calculate Fade Timer
+        if (currentMicros - previousFade[i] >= FadeTimerPart[i])
+        {
+            previousFade[i] = currentMicros;
+            CurrentFadeTime[i] += FadeTimerPart[i];
+            TimerPercentage = (double)CurrentFadeTime[i] / (double)FadeTimer[i] * 100.00;
+        }
+    
+        // calculate Circle Timer
+        if (currentMicros - previousCircle[i] >= CircleTimerPart[i])
+        {
+            previousCircle[i] = currentMicros;
+            CurrentCircleTime[i] += CircleTimerPart[i];
+            CirclePercentage = (double)CurrentCircleTime[i] / (double)FadeTimer[i] * 100.00;
+        }
+            
+        Serial.print("Area: ");
+        Serial.print(i);
+        Serial.print(" | colormode: ");
+        Serial.print(color_mode[i]);
 
+        Serial.print(" | CirclePercentage: ");
+        Serial.print(CirclePercentage);
+
+        Serial.print(" | TimerPercentage: ");
+        Serial.println(TimerPercentage);
+        
+          
+        // Color-Mode 0: solid
+        if(color_mode[i] == 0)
+        {         
+            // ToDo
+        }
+        // Color-Mode 1: rainbow
+        if(color_mode[i] == 1)
+        { 
+            // ToDo
+        }
+        // Color-Mode 2: rainbow cycle
+        if(color_mode[i] == 1)
+        { 
+            // ToDo
+        }
+    }
+    
+    
     // New color Info set
     // fade starts from current colors :-)
-    if(CurrentFadeTime == 0)
+  /*  if(CurrentFadeTime == 0)
     {
         for(int i = 0; i < AREAS; i++)
         {
@@ -191,7 +212,7 @@ void loop()
                  *       -> every run the counter is raised
                  *       -> the for loop of AREAS is the cause.
                  *  e.g 4 Areas -> Every AREA now has only 64 Steps!!!
-                 */
+                 *
                 FadeLightTwo(i);
             }
     
@@ -215,13 +236,63 @@ void loop()
         { 
             // ToDo ?!
         }
-    }
+    }*/
 }
 
 
 //////////////////////
 // Helper functions //
 //////////////////////
+
+
+bool RecieveUpdPackage()
+{
+    bool ok = false;
+    
+    // if there’s data available, read a packet
+    int packetSize = UDP.parsePacket();
+    if (packetSize)
+    {
+        // ToDo: deaktivate! Serial.println because of performance.
+        
+        Serial.println("");
+        Serial.print("Received packet of size ");
+        Serial.println(packetSize);
+        Serial.print("From ");
+        IPAddress remote = UDP.remoteIP();
+        for (int i = 0; i < 4; i++)
+        {
+            Serial.print(remote[i], DEC);
+            if (i < 3)
+            {
+                Serial.print(".");
+            }
+        }
+        Serial.print(", port ");
+        Serial.println(UDP.remotePort());
+
+        // Clear Buffer before reading
+        for( int i = 0; i < UDP_TX_PACKET_MAX_SIZE;  ++i )
+        {
+            packetBuffer[i] = (char)0;
+        }
+
+        // read the packet into packetBufffer
+        UDP.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
+        Serial.println("Contents: ");                
+        Serial.println(packetBuffer);
+
+        ok = UpdateDataFromJson(packetBuffer);
+        
+        // send a reply, to the IP address and port that sent us the packet we received
+        UDP.beginPacket(UDP.remoteIP(), UDP.remotePort());
+        UDP.write(ReplyBuffer);
+        UDP.endPacket();
+        delay(10);
+    }   
+
+     return ok;
+}
 
 // Deserialize JSON-String
 bool UpdateDataFromJson(char* json)
