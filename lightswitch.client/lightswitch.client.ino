@@ -13,15 +13,19 @@
 // The Strips can be controlled from the lightswitch.space-Server.
 //
 
-const unsigned long FadeTimer[AREAS] = {2000000}; // total fadetime in milliseconds for a colorchange
+#define _DEBUG false
+#define _DEBUG_FADE false
+
+unsigned long FadeTimer[AREAS] = {0}; 
 unsigned long FadeTimerPart[AREAS] = {0};
 unsigned long CurrentFadeTime[AREAS] = {0};
-unsigned long previousFade[AREAS] = {1};
+unsigned long previousFade[AREAS] = {0};
+bool fade[AREAS] = {false};
 
-const unsigned long CircleTimer[AREAS] = {10000000}; // total fadetime in milliseconds for a colorchange
+unsigned long CircleTimer[AREAS] = {0}; 
 unsigned long CircleTimerPart[AREAS] = {0};
 unsigned long CurrentCircleTime[AREAS] = {0};
-unsigned long previousCircle[AREAS] = {1};
+unsigned long previousCircle[AREAS] = {0};
 
 // A light-element has a unique ID, so it can be identfied within the network.
 // The MAC-address is taken as unique ID, so no need to change this parameter
@@ -76,6 +80,9 @@ void setup()
         }
 
         // Initialize Fadetimer / Circletimer
+        FadeTimer[i]   = 10000000; // total fadetime in milliseconds for a colorchange
+        CircleTimer[i] = 8000000; // total fadetime in milliseconds for a colorchange
+
         FadeTimerPart[i] = FadeTimer[i] / 255;
         CircleTimerPart[i] = CircleTimer[i] / 255;
     }
@@ -122,7 +129,16 @@ void loop()
             {
                 for(int i = 0; i < AREAS; i++)
                 {
+                    if(_DEBUG)
+                    {
+                        Serial.println("### Fadetime Reset ###");
+                        Serial.print("ColorMode: ");
+                        Serial.println(color_mode[i]);
+                    }
+                    
                     CurrentFadeTime[i] = 0;
+                    fade[i] = true;
+
                 }
             }
         }
@@ -134,6 +150,12 @@ void loop()
     
     for(int i = 0; i < AREAS; i++)
     {
+        if(_DEBUG)
+        {
+            Serial.print("### For Each Area ### Current: ");
+            Serial.println(i);
+        }
+        
         unsigned long currentMicros = micros();
         double TimerPercentage = -1;
         double CirclePercentage = -1;
@@ -151,74 +173,80 @@ void loop()
         {
             previousCircle[i] = currentMicros;
             CurrentCircleTime[i] += CircleTimerPart[i];
-            CirclePercentage = (double)CurrentCircleTime[i] / (double)FadeTimer[i] * 100.00;
+            CirclePercentage = (double)CurrentCircleTime[i] / (double)CircleTimer[i] * 100.00;
         }
-            
-        Serial.print("Area: ");
-        Serial.print(i);
-        Serial.print(" | colormode: ");
-        Serial.print(color_mode[i]);
-
-        Serial.print(" | CirclePercentage: ");
-        Serial.print(CirclePercentage);
-
-        Serial.print(" | TimerPercentage: ");
-        Serial.println(TimerPercentage);
-        
-          
-        // Color-Mode 0: solid
-        if(color_mode[i] == 0)
-        {         
-            // ToDo
-        }
-        // Color-Mode 1: rainbow
-        if(color_mode[i] == 1)
-        { 
-            // ToDo
-        }
-        // Color-Mode 2: rainbow cycle
-        if(color_mode[i] == 1)
-        { 
-            // ToDo
-        }
-    }
-    
-    
-    // New color Info set
-    // fade starts from current colors :-)
-  /*  if(CurrentFadeTime == 0)
-    {
-        for(int i = 0; i < AREAS; i++)
+                
+        if(CirclePercentage > 100)
         {
-            from_red[i] = current_red[i];
-            from_green[i] = current_green[i];
-            from_blue[i] = current_blue[i];
-            from_white[i] = current_white[i];
+            CirclePercentage = 0;
+            CurrentCircleTime[i] = 0;
         }
-    }
+
+        if(_DEBUG)
+        {
+            Serial.print("Current Micros:         ");
+            Serial.println(currentMicros);
+            Serial.print("Color Mode:             ");
+            Serial.println(color_mode[i]); 
+            Serial.print("   -> TimerPercentage:  ");
+            Serial.println(TimerPercentage);
+            Serial.print("   -> CirclePercentage: ");
+            Serial.println(CirclePercentage);
+        }
         
-    for(int i = 0; i < AREAS; i++)
-    {
         // Color-Mode 0: solid
-        if(color_mode[i] == 0)
-        {         
+        if(color_mode[i] == 0 && TimerPercentage > -1)
+        {    
+            if(_DEBUG)
+            {  
+                Serial.print("AREA: ");
+                Serial.print(i);
+                Serial.print(" | TimerPercentage: ");
+                Serial.println(TimerPercentage);
+            }
+            
+            if(fade[i] == true)
+            {
+                if(_DEBUG)
+                {
+                    Serial.println("### 1 ###");
+                }
+                
+                from_red[i] = current_red[i];
+                from_green[i] = current_green[i];
+                from_blue[i] = current_blue[i];
+                from_white[i] = current_white[i];
+
+                fade[i] == false;
+            }
+
             if(current_red[i] != target_red[i]
                 || current_green[i] != target_green[i]
                 || current_blue[i] != target_blue[i]
                 || current_white[i] != target_white[i])
             {
-                /* ToDo: Bug in Fadetime assumption:
-                 *       -> Calculation of passed time (micros) is not correct.
-                 *       -> every run the counter is raised
-                 *       -> the for loop of AREAS is the cause.
-                 *  e.g 4 Areas -> Every AREA now has only 64 Steps!!!
-                 *
-                FadeLightTwo(i);
+                if(_DEBUG)
+                {
+                    Serial.println("### 2 ###");
+                    Serial.print("From:    ");
+                    Serial.println(from_red[i]);
+                    Serial.print("Current: ");
+                    Serial.println(current_red[i]);
+                    Serial.print("Target:  ");
+                    Serial.println(target_red[i]);
+                }
+                
+                FadeLightTwo(i, TimerPercentage);
             }
-    
-            if(CurrentFadeTime > FadeTimer)
+
+            if(CurrentFadeTime[i] > FadeTimer[i])
             {
-                CurrentFadeTime = 0;
+                if(_DEBUG)
+                {
+                    Serial.println("### 3 ###");
+                }
+                
+                CurrentFadeTime[i] = 0;
     
                 current_red[i] = target_red[i];
                 current_green[i] = target_green[i];
@@ -227,16 +255,24 @@ void loop()
             }
         }
         // Color-Mode 1: rainbow
-        if(color_mode[i] == 1)
-        { 
-           // ToDo ?! 
+        if(color_mode[i] == 1 && CirclePercentage > -1)
+        {
+            if(_DEBUG)
+            {
+                Serial.println("### RainbowFade ###");
+            }
+            RainbowFade(i, CirclePercentage);
         }
         // Color-Mode 2: rainbow cycle
-        if(color_mode[i] == 1)
+        if(color_mode[i] == 2 && CirclePercentage > -1)
         { 
-            // ToDo ?!
+            if(_DEBUG)
+            {
+                Serial.println("### RainbowCycleFade ###");
+            }
+            RainbowCycleFade(i, CirclePercentage);
         }
-    }*/
+    }
 }
 
 
@@ -380,19 +416,67 @@ bool UpdateDataFromJson(char* json)
     return state;
 }
 
-/*
-void rainbow() {
-  uint16_t i, j;
+// Rainbow Effekt Loop
+void RainbowFade(int a, double percentage) {
+    uint16_t j;
 
-  for(j=0; j<256; j++) {
-    for(i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel((i+j) & 255));
+    double value_rainbow = (double)255 * percentage / (double)100;    
+    j = (int) floor(value_rainbow);
+
+    if(j > 255)
+        j = 255;
+    if(j < 0)
+        j = 0;
+
+    if(_DEBUG_FADE)
+    {
+        //Serial.print("ValueRainbow:   ");
+        //Serial.println(value_rainbow);
+        Serial.print("           j:   ");
+        Serial.println(j);
+        Serial.print("   Wheel (0):   ");
+        Serial.println(Wheel((j) & 255));
     }
-    strip.show();
-  }
+    
+    for (int i = 0; i < AREA[a].numPixels(); i++) 
+    {
+        // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+        AREA[a].setPixelColor(i, Wheel(j & 255));                    
+    }
+    
+    AREA[a].show();
 }
-*/
 
+// Rainbow-Cycle Effekt Loop
+void RainbowCycleFade(int a, double percentage) {
+    uint16_t j;
+
+    double value_rainbow = (double)255 * percentage / (double)100;    
+    j = (int) floor(value_rainbow);
+
+    if(j > 255)
+        j = 255;
+    if(j < 0)
+        j = 0;
+
+    if(_DEBUG_FADE)
+    {
+        //Serial.print("ValueRainbow:   ");
+        //Serial.println(value_rainbow);
+        Serial.print("           j:   ");
+        Serial.println(j);
+        Serial.print("   Wheel (0):   ");
+        Serial.println(Wheel((j) & 255));
+    }
+    
+    for (int i = 0; i < AREA[a].numPixels(); i++) 
+    {
+        // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+        AREA[a].setPixelColor(i, Wheel(((i * 256 / AREA[a].numPixels()) +j) & 255));                
+    }
+    
+    AREA[a].show();
+}
 
 /*void rainbowCycle() {
   uint16_t i, j;
@@ -407,56 +491,49 @@ void rainbow() {
 */
 
 // New time and color constant Fader version
-void FadeLightTwo(int a)
+void FadeLightTwo(int a, double percentage)
 {
-    unsigned long currentMicros = micros();
+    percentage = percentage / 100;
+    
+    double value_red = (double)(target_red[a] - from_red[a]) * percentage + (double)from_red[a];
+    double value_green = (double)(target_green[a] - from_green[a]) * percentage + (double)from_green[a];
+    double value_blue = (double)(target_blue[a] - from_blue[a]) * percentage + (double)from_blue[a];
+    double value_white = (double)(target_white[a] - from_white[a]) * percentage + (double)from_white[a];
 
-    if (currentMicros - previousFade >= FadeTimerPart)
-    {
-        previousFade = currentMicros;
-        CurrentFadeTime += FadeTimerPart;
-        double percentage = (double)CurrentFadeTime / (double)FadeTimer;
+    int check_red = (int) floor(value_red);
+    if(check_red > 255)
+        check_red = 255;
+    if(check_red < 0)
+        check_red = 0;
 
-        double value_red = (double)(target_red[a] - from_red[a]) * percentage + (double)from_red[a];
-        double value_green = (double)(target_green[a] - from_green[a]) * percentage + (double)from_green[a];
-        double value_blue = (double)(target_blue[a] - from_blue[a]) * percentage + (double)from_blue[a];
-        double value_white = (double)(target_white[a] - from_white[a]) * percentage + (double)from_white[a];
+    int check_green = (int) floor(value_green);
+    if(check_green > 255)
+        check_green = 255;
+    if(check_green < 0)
+        check_green = 0;
+        
+    int check_blue = (int) floor(value_blue);
+    if(check_blue > 255)
+        check_blue = 255;
+    if(check_blue < 0)
+        check_blue = 0;
 
-        int check_red = (int) floor(value_red);
-        if(check_red > 255)
-            check_red = 255;
-        if(check_red < 0)
-            check_red = 0;
+    int check_white = (int) floor(value_white);
+    if(check_white > 255)
+        check_white = 255;
+    if(check_white < 0)
+        check_white = 0;
+        
+    current_red[a]      = check_red;
+    current_green[a]    = check_green;
+    current_blue[a]     = check_blue;
+    current_white[a]    = check_white;
 
-        int check_green = (int) floor(value_green);
-        if(check_green > 255)
-            check_green = 255;
-        if(check_green < 0)
-            check_green = 0;
-            
-        int check_blue = (int) floor(value_blue);
-        if(check_blue > 255)
-            check_blue = 255;
-        if(check_blue < 0)
-            check_blue = 0;
-
-        int check_white = (int) floor(value_white);
-        if(check_white > 255)
-            check_white = 255;
-        if(check_white < 0)
-            check_white = 0;
-            
-        current_red[a]      = check_red;
-        current_green[a]    = check_green;
-        current_blue[a]     = check_blue;
-        current_white[a]    = check_white;
-
-        /*Serial.print(CurrentFadeTime);
-        Serial.print(" | ");
-        Serial.print(percentage, 2);
-        Serial.print(" | ");
-        Serial.println(current_red[a]);*/
-    }
+    /*Serial.print(CurrentFadeTime);
+    Serial.print(" | ");
+    Serial.print(percentage, 2);
+    Serial.print(" | ");
+    Serial.println(current_red[a]);*/
     
     for (int i = 0; i < AREA[a].numPixels(); i++) {
         // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
@@ -546,7 +623,7 @@ void broadcastMyself()
         //
         // Step 1: Reserve memory space
         //
-        StaticJsonBuffer<1000> jsonBuffer;
+        StaticJsonBuffer<2000> jsonBuffer;
         
         //
         // Step 2: Build object tree in memory
@@ -603,12 +680,12 @@ String macToStr(const uint8_t* mac)
 uint32_t Wheel(byte WheelPos) {
   WheelPos = 255 - WheelPos;
   if(WheelPos < 85) {
-    return (byte)(255 - WheelPos * 3) & (byte)(0) & (byte)(WheelPos * 3) & (byte)(0);
+    return (byte)(255 - WheelPos * 3)<<16 | (byte)(0)<<8 | (byte)(WheelPos * 3)<<0 | (byte)(0)<<24;
   }
   if(WheelPos < 170) {
     WheelPos -= 85;
-    return (byte)(0) & (byte)(WheelPos * 3) & (byte)(255 - WheelPos * 3) & (byte)(0);
+    return (byte)(0)<<16 | (byte)(WheelPos * 3)<<8 | (byte)(255 - WheelPos * 3)<<0 | (byte)(0)<<24;
   }
   WheelPos -= 170;
-  return (byte)(WheelPos * 3) & (byte)(255 - WheelPos * 3) & (byte)(0) & (byte)(0);
+  return (byte)(WheelPos * 3)<<16 | (byte)(255 - WheelPos * 3)<<8 | (byte)(0)<<0 | (byte)(0)<<24;
 }
