@@ -2,9 +2,5 @@ config.h
 *.sublime-project
 *.idea
 *.sublime-workspace
-
 *.bin
-
-*.bin
-
-lightswitch.client/lightswitch.client.ino.adafruit.bin
+*.DS_Store
