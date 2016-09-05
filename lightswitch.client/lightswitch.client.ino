@@ -7,7 +7,8 @@
 
 //
 // lightswitch.space Client
-// version: 0.5alpha
+// version: 1.0 beta
+#define FIRMWARE "1.0"
 //
 // This Sketch is used to control a bunch of SK2812 LEDs (aka Neopixel)
 // The Strips can be controlled from the lightswitch.space-Server.
@@ -101,6 +102,7 @@ void setup()
     byte mac[6];
     WiFi.macAddress(mac);
     ID = WiFi.macAddress(); // ToDo: Remove the colons from MAC address
+    ID = String(mac[0], HEX) + String(mac[1], HEX) +String(mac[2], HEX) +String(mac[3], HEX) +String(mac[4], HEX) +String(mac[5], HEX);
 }
 
 void loop()
@@ -478,18 +480,6 @@ void RainbowCycleFade(int a, double percentage) {
     AREA[a].show();
 }
 
-/*void rainbowCycle() {
-  uint16_t i, j;
-
-  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-    for(i=0; i< strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-    }
-    strip.show();
-  }
-}
-*/
-
 // New time and color constant Fader version
 void FadeLightTwo(int a, double percentage)
 {
@@ -631,6 +621,7 @@ void broadcastMyself()
         JsonObject& root = jsonBuffer.createObject();
         root["light_id"] = ID;
         root["name"] = NAME;
+        root["fw_version"] = FIRMWARE;
         
         JsonArray& areas = root.createNestedArray("areas");
 
@@ -640,6 +631,7 @@ void broadcastMyself()
             area["number"] = i;
             area["name"] = AREA_NAME[i];
             area["color_type"] = AREA_TYPE[i];
+            area["supported_modes"] = AREA_MODES[i];
 
             JsonArray& values = area.createNestedArray("values");
 
