@@ -562,7 +562,7 @@ boolean connectWiFi() {
     }
     if (state) {
         Serial.println("");
-        Serial.println(" --- lightswitch.space client ---");
+        Serial.println(" --- luxbox.io client ---");
         Serial.print("Connected to ");
         Serial.println(ssid[currentWifi]);
         Serial.print("IP address: ");
